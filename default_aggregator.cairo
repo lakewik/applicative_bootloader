@@ -7,9 +7,8 @@ from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash_many
 
 
 struct AggregatedOutput {
-    fact_hashes: felt*,
     child_outputs_hashes: felt*,
-    num_facts: felt,
+    num_outputs_hashes: felt,
 }
 
 func main{
@@ -46,15 +45,11 @@ func main{
     %}
 
 
-    let (fact_hashes: felt*) = alloc();
     let (child_outputs_hashes: felt*) = alloc();
     with poseidon_ptr {
-        let (fact_hashes, child_outputs_hashes) = compute_fact_hashes(
+        let (child_outputs_hashes) = compute_childs_outputs_hashes(
             child_outputs=child_outputs,
             child_output_lengths=child_output_lengths,
-            child_hashes=child_hashes,
-            bootloader_hash=bootloader_hash,
-            fact_hashes=fact_hashes,
             child_outputs_hashes=child_outputs_hashes,
             remaining=num_child_outputs,
             index=0
@@ -63,9 +58,8 @@ func main{
     
 
     let aggregated_output = AggregatedOutput(
-        fact_hashes=fact_hashes,
         child_outputs_hashes=child_outputs_hashes,
-        num_facts=num_child_outputs,
+        num_outputs_hashes=num_child_outputs,
     );
 
     let (input_hash: felt) = poseidon_hash_many(n=num_child_outputs, elements=child_outputs_hashes);
@@ -79,7 +73,7 @@ func main{
 
     memcpy(
         dst=output_ptr,
-        src=fact_hashes,
+        src=child_outputs_hashes,
         len=num_child_outputs,
     );
     let output_ptr = &output_ptr[num_child_outputs];
@@ -94,22 +88,19 @@ func main{
 }
 
 
-func compute_fact_hashes{
+func compute_childs_outputs_hashes{
     poseidon_ptr: PoseidonBuiltin*,
 }(
     child_outputs: felt**,
     child_output_lengths: felt*,
-    child_hashes: felt*,
-    bootloader_hash: felt,
-    fact_hashes: felt*,
     child_outputs_hashes: felt*,
     remaining: felt,
     index: felt
-) -> (fact_hashes: felt*, child_outputs_hashes: felt*) {
+) -> ( child_outputs_hashes: felt*) {
     alloc_locals;
 
     if (remaining == 0) {
-        return (fact_hashes=fact_hashes,child_outputs_hashes=child_outputs_hashes);
+        return (child_outputs_hashes=child_outputs_hashes);
     }
 
     let output_ptr = child_outputs[index];
@@ -120,32 +111,18 @@ func compute_fact_hashes{
         elements=output_ptr
     );
 
-    let (hash_input: felt*) = alloc();
-    assert hash_input[0] = bootloader_hash;
-    assert hash_input[1] = child_hashes[index];
-    assert hash_input[2] = output_hash;
-
-    let (fact_hash) = poseidon_hash_many(
-        n=3,
-        elements=hash_input
-    );
-
     %{
         print("aggregator processing child at index", ids.index)
         print("child output hash", ids.output_hash)
     %}
     
 
-    assert fact_hashes[index] = fact_hash;
     assert child_outputs_hashes[index] = output_hash;
 
     with poseidon_ptr {
-        return compute_fact_hashes(
+        return compute_childs_outputs_hashes(
             child_outputs=child_outputs,
             child_output_lengths=child_output_lengths,
-            child_hashes=child_hashes,
-            bootloader_hash=bootloader_hash,
-            fact_hashes=fact_hashes,
             child_outputs_hashes=child_outputs_hashes,
             remaining=remaining - 1,
             index=index + 1

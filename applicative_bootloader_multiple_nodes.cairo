@@ -205,6 +205,18 @@ func main{
     // calclate the final path hash
     let (path_hash: felt) = poseidon_hash_many(n=nodes_len + 2, elements=path_hash_buff);
 
+    let (fact_hashes: felt*) = alloc();
+    with poseidon_ptr {
+        let (fact_hashes) = compute_fact_hashes(
+            child_outputs_hashes=output_hashes,
+            child_hashes=verified_program_hashes,
+            aggregator_hash=aggregator_program_hash,
+            fact_hashes=fact_hashes,
+            remaining=nodes_len,
+            index=0
+        );
+    }
+
     assert output_ptr[0] = path_hash;
     let output_ptr = &output_ptr[1];
 
@@ -215,5 +227,56 @@ func main{
     memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
     let output_ptr = output_ptr + aggregated_output_length;
 
+    memcpy(dst=output_ptr, src=fact_hashes, len=nodes_len);
+    let output_ptr = output_ptr + nodes_len;
+
     return ();
+}
+
+
+func compute_fact_hashes{
+    poseidon_ptr: PoseidonBuiltin*,
+}(
+    child_outputs_hashes: felt*,
+    child_hashes: felt*,
+    aggregator_hash: felt,
+    fact_hashes: felt*,
+    remaining: felt,
+    index: felt
+) -> (fact_hashes: felt*) {
+    alloc_locals;
+
+    if (remaining == 0) {
+        return (fact_hashes=fact_hashes);
+    }
+
+
+    let (hash_input: felt*) = alloc();
+    assert hash_input[0] = aggregator_hash;
+    assert hash_input[1] = child_hashes[index];
+    assert hash_input[2] = child_outputs_hashes[index];
+
+    let (fact_hash) = poseidon_hash_many(
+        n=3,
+        elements=hash_input
+    );
+
+    %{
+        print("calculatig fact hash for child at index", ids.index)
+        print("fact hash hash", ids.fact_hash)
+    %}
+    
+
+    assert fact_hashes[index] = fact_hash;
+
+    with poseidon_ptr {
+        return compute_fact_hashes(
+            child_outputs_hashes=child_outputs_hashes,
+            child_hashes=child_hashes,
+            aggregator_hash=aggregator_hash,
+            fact_hashes=fact_hashes,
+            remaining=remaining - 1,
+            index=index + 1
+        );
+    }
 }
