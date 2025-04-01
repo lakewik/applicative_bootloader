@@ -14,6 +14,8 @@ PROOF_FOLDER = "proofs"
 VERIFIER_PROGRAM = "cairo_verifier.compiled.json"
 NODE1_PROOF_FILE = "node1.proof.json"
 NODE2_PROOF_FILE = "node2.proof.json"
+NODE3_PROOF_FILE = "node3.proof.json"
+
 NODE1_AR_PROGRAM_INPUT_FILE = "node1_ar.input.json"
 NODE2_AR_PROGRAM_INPUT_FILE = "node2_ar.input.json"
 APPLICATIVE_BOOTLOADER_PROGRAM_INPUT_FILE = "applicative_bootloader.input.json"
@@ -73,10 +75,11 @@ def main():
                             ),
                             program_input={
                                 "bootloader_hash": APPLICATIVE_BOOTLOADER_HASH,
-                                "child_hashes": [2557027888828840286493295052495263447296531023603501824658462648621573665939, 2557027888828840286493295052495263447296531023603501824658462648621573665939],
+                                "child_hashes": [2557027888828840286493295052495263447296531023603501824658462648621573665939, 2557027888828840286493295052495263447296531023603501824658462648621573665939, 2557027888828840286493295052495263447296531023603501824658462648621573665939],
                                 "child_outputs": [
                                     [0, 1, 1, 10, 89, 144],
-                                    [0, 89, 144, 10, 10946, 17711]
+                                    [0, 89, 144, 10, 10946, 17711],
+                                    [0, 10946, 17711, 10, 1346269, 2178309]
                                 ]
                             },
                             use_poseidon=True,
@@ -104,6 +107,20 @@ def main():
                                     "proof": json.loads(
                                         open(
                                             os.path.join(PROOF_FOLDER, NODE2_PROOF_FILE),
+                                            "r",
+                                        ).read()
+                                    )
+                                },
+                                use_poseidon=True,
+                            ),
+                            RunProgramTask(
+                                program=Program.Schema().load(
+                                    json.loads(open(VERIFIER_PROGRAM, "r").read())
+                                ),
+                                program_input={
+                                    "proof": json.loads(
+                                        open(
+                                            os.path.join(PROOF_FOLDER, NODE3_PROOF_FILE),
                                             "r",
                                         ).read()
                                     )

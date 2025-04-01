@@ -10,6 +10,8 @@ LAYOUT = "recursive_with_poseidon"
 NODE_PROGRAM = "node.compiled.json"
 NODE1_PROGRAM_INPUT_FILE = "inputs/node1.input.json"
 NODE2_PROGRAM_INPUT_FILE = "inputs/node2.input.json"
+NODE3_PROGRAM_INPUT_FILE = "inputs/node3.input.json"
+
 AGGREGATOR_PROGRAM = "aggregator.compiled.json"
 AGGREGATOR_PROGRAM_INPUT_FILE = "aggregator.input.json"
 
@@ -34,6 +36,16 @@ def main():
         )
 
         stone_prove(tmpdir=tmpdir, out_file="./proofs/node2.proof.json")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cairo_run(
+            tmpdir=tmpdir,
+            layout=LAYOUT,
+            program=NODE_PROGRAM,
+            program_input=NODE3_PROGRAM_INPUT_FILE,
+        )
+
+        stone_prove(tmpdir=tmpdir, out_file="./proofs/node3.proof.json")
 
 
 if __name__ == "__main__":
