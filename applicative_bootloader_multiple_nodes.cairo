@@ -1,0 +1,219 @@
+%builtins output pedersen range_check bitwise poseidon
+
+from starkware.cairo.bootloaders.simple_bootloader.run_simple_bootloader import (
+    run_simple_bootloader,
+)
+from starkware.cairo.common.cairo_builtins import HashBuiltin, PoseidonBuiltin
+from starkware.cairo.common.alloc import alloc
+from starkware.cairo.common.memcpy import memcpy
+from starkware.cairo.common.registers import get_fp_and_pc
+from starkware.cairo.cairo_verifier.objects import CairoVerifierOutput
+from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash_many
+from objects import BootloaderOutput, bootloader_output_extract_output_hashes
+
+func hash_verified_program_hashes{
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+    bitwise_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+}(elements: felt*, n: felt, accumulated_hash: felt) -> (hash: felt) {
+    if (n == 0) {
+        return (accumulated_hash,);
+    }
+
+    let (new_hash) = poseidon_hash_many(n=1, elements=elements);
+    let (final_hash) = hash_verified_program_hashes(
+        elements=elements + 1,
+        n=n - 1,
+        accumulated_hash=new_hash,
+    );
+    return (final_hash,);
+}
+
+func main{
+    output_ptr: felt*,
+    pedersen_ptr: HashBuiltin*,
+    range_check_ptr,
+    bitwise_ptr,
+    poseidon_ptr: PoseidonBuiltin*,
+}() {
+    alloc_locals;
+
+    let (__fp__, _) = get_fp_and_pc();
+
+    // A pointer to the aggregator's task output.
+    local aggregator_output_ptr: felt*;
+    %{
+        from objects import ApplicativeBootloaderInput
+        from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput
+
+        # Create a segment for the aggregator output.
+        ids.aggregator_output_ptr = segments.add()
+
+        # Load the applicative bootloader input and the aggregator task.
+        applicative_bootloader_input = ApplicativeBootloaderInput.Schema().load(program_input)
+        aggregator_task = applicative_bootloader_input.aggregator_task.load_task()
+
+        # Create the simple bootloader input.
+        simple_bootloader_input = SimpleBootloaderInput(
+            tasks=[aggregator_task], fact_topologies_path=None, single_page=True
+        )
+
+        # Change output builtin state to a different segment in preparation for running the
+        # aggregator task.
+        applicative_output_builtin_state = output_builtin.get_state()
+        output_builtin.new_state(base=ids.aggregator_output_ptr)
+    %}
+
+    %{
+        print("applicative bootloader starting aggregator bootloading phase")
+    %}
+
+    // Save aggregator output start.
+    let aggregator_output_start: felt* = aggregator_output_ptr;
+
+    // Execute the simple bootloader with the aggregator task.
+    run_simple_bootloader{output_ptr=aggregator_output_ptr}();
+    let range_check_ptr = range_check_ptr;
+    let bitwise_ptr = bitwise_ptr;
+    let pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
+    local aggregator_output_end: felt* = aggregator_output_ptr;
+
+    // Check that exactly one task was executed.
+    assert aggregator_output_start[0] = 1;
+
+    // Extract the aggregator output size and program hash.
+    let aggregator_output_length = aggregator_output_start[1];
+    let aggregator_program_hash = aggregator_output_start[2];
+    let aggregator_input_ptr = &aggregator_output_start[3];
+
+    %{
+        print("hash of default applicative aggregator", ids.aggregator_program_hash)
+        print("applicative bootloader finished aggregator bootloading phase")
+    %}
+
+    // Allocate a segment for the bootloader output.
+    local bootloader_output_ptr: felt*;
+    %{
+        from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput
+
+        # Save the aggregator's fact_topologies before running the bootloader.
+        aggregator_fact_topologies = fact_topologies
+        fact_topologies = []
+
+        # Create a segment for the bootloader output.
+        ids.bootloader_output_ptr = segments.add()
+
+        # Create the bootloader input.
+        simple_bootloader_input = SimpleBootloaderInput(
+            tasks=applicative_bootloader_input.tasks, fact_topologies_path=None, single_page=True
+        )
+
+        # Change output builtin state to a different segment in preparation for running the
+        # bootloader.
+        output_builtin.new_state(base=ids.bootloader_output_ptr)
+    %}
+
+    %{
+        print("applicative bootloader starting verifiers bootloading phase")
+    %}
+
+    // Save the bootloader output start.
+    let bootloader_output_start = bootloader_output_ptr;
+
+    // Execute the bootloader.
+    run_simple_bootloader{output_ptr=bootloader_output_ptr}();
+    let range_check_ptr = range_check_ptr;
+    let bitwise_ptr = bitwise_ptr;
+    let pedersen_ptr: HashBuiltin* = pedersen_ptr;
+    let poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
+    local bootloader_output_end: felt* = bootloader_output_ptr;
+
+    let bootloader_output_length = bootloader_output_end - bootloader_output_start - 1;
+    let nodes_len = bootloader_output_length / BootloaderOutput.SIZE;
+
+    // Assert that the bootloader output agrees with the aggregator input.
+    let (local verified_program_hashes: felt*) = alloc();
+    let (local output_hashes: felt*) = alloc();
+    bootloader_output_extract_output_hashes(
+        list=cast(&bootloader_output_start[1], BootloaderOutput*),
+        len=nodes_len,
+        verified_program_hashes=verified_program_hashes,
+        output_hashes=output_hashes,
+    );
+
+    %{
+        print("applicative bootloader finished verifiers bootloading phase")
+    %}
+
+    %{
+        print("=== aggregator_input_ptr[0] ===")
+        print("aggregator_input_ptr[0] =", memory[ids.aggregator_input_ptr])
+
+        for i in range(ids.nodes_len):
+            base = ids.bootloader_output_start + i * 4  # 4 fields per BootloaderOutput
+            output_len = memory[base]
+            #program_hash = memory[base + 1]
+            output_start = memory[base + 2]
+            output_end = memory[base + 3]
+
+            print(f"--- Node {i} ---")
+            #print("program_hash", program_hash)
+            #print("output_length", output_len)
+            print("output_hash", memory[ids.output_hashes + i])
+            print("verified_program_hash", memory[ids.verified_program_hashes + i])
+    %}
+
+    let (input_hash: felt) = poseidon_hash_many(n=nodes_len, elements=output_hashes);
+
+    %{
+        print("input_hash calculated in applicative bootloader", ids.input_hash)
+    %}
+
+    %{
+        print("input_hash from applicative bootloader calculated on aggregator", memory[ids.aggregator_input_ptr])
+    %}
+
+    // Check if aggregator program was ran on correct inputs
+    assert aggregator_input_ptr[0] = input_hash;
+
+    %{
+        # Restore the output builtin state.
+        output_builtin.set_state(applicative_output_builtin_state)
+    %}
+
+    let aggregated_output_ptr = aggregator_input_ptr + 1;
+    let aggregated_output_length = aggregator_output_end - aggregated_output_ptr;
+
+    let (path_hash_buff: felt*) = alloc();
+    tempvar path_hash_buff_size = nodes_len + 2;
+    
+    // aggregator program path_hash
+    assert path_hash_buff[0] = aggregated_output_ptr[0];
+    
+    // aggregator program hash 
+    assert path_hash_buff[1] = aggregator_program_hash;
+    
+    // copy all verified program hashes
+    let (path_hash_ptr: felt*) = alloc();
+    let path_hash_ptr = path_hash_buff + 2;
+    
+    // copy verified program hashes to path_hash_buff
+    memcpy(dst=path_hash_ptr, src=verified_program_hashes, len=nodes_len);
+    
+    // calclate the final path hash
+    let (path_hash: felt) = poseidon_hash_many(n=nodes_len + 2, elements=path_hash_buff);
+
+    assert output_ptr[0] = path_hash;
+    let output_ptr = &output_ptr[1];
+
+    %{
+        print("path_hash", ids.path_hash)
+    %}
+
+    memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
+    let output_ptr = output_ptr + aggregated_output_length;
+
+    return ();
+}
