@@ -1,12 +1,16 @@
 import os
 import json
-from objects import NodeClaim
+from objects import (
+    NodeClaim, 
+    StarkVerifier,
+    ChildProof
+)
 import tempfile
 from utils import cairo_run, stone_prove
 from objects import ApplicativeBootloaderInput
 from starkware.cairo.bootloaders.simple_bootloader.objects import (
     RunProgramTask,
-    Program,
+    Program
 )
 
 INPUT_FOLDER = "inputs"
@@ -26,7 +30,6 @@ NODE_PROGRAM = "node.compiled.json"
 DEFAULT_AGGREGATOR_PROGRAM = "default_aggregator.compiled.json"
 DEFAULT_AGGREGATOR_PROGRAM_INPUT_FILE = "default_aggregator.input.json"
 APPLICATIVE_BOOTLOADER_PROGRAM = "applicative_bootloader_multiple_nodes.compiled.json"
-APPLICATIVE_BOOTLOADER_HASH = 1002739126764932141686192315730668396057451740662147624852550207088289098496
 
 
 
@@ -74,8 +77,6 @@ def main():
                                 json.loads(open(DEFAULT_AGGREGATOR_PROGRAM, "r").read())
                             ),
                             program_input={
-                                "bootloader_hash": APPLICATIVE_BOOTLOADER_HASH,
-                                "child_hashes": [2557027888828840286493295052495263447296531023603501824658462648621573665939, 2557027888828840286493295052495263447296531023603501824658462648621573665939, 2557027888828840286493295052495263447296531023603501824658462648621573665939],
                                 "child_outputs": [
                                     [0, 1, 1, 10, 89, 144],
                                     [0, 89, 144, 10, 10946, 17711],
@@ -84,48 +85,36 @@ def main():
                             },
                             use_poseidon=True,
                         ),
-                        tasks=[
-                            RunProgramTask(
-                                program=Program.Schema().load(
-                                    json.loads(open(VERIFIER_PROGRAM, "r").read())
-                                ),
-                                program_input={
-                                    "proof": json.loads(
-                                        open(
-                                            os.path.join(PROOF_FOLDER, NODE1_PROOF_FILE),
-                                            "r",
-                                        ).read()
-                                    )
-                                },
-                                use_poseidon=True,
+                        stark_verifier=StarkVerifier(
+                            program=Program.Schema().load(
+                                        json.loads(open(VERIFIER_PROGRAM, "r").read())
                             ),
-                            RunProgramTask(
-                                program=Program.Schema().load(
-                                    json.loads(open(VERIFIER_PROGRAM, "r").read())
-                                ),
-                                program_input={
-                                    "proof": json.loads(
-                                        open(
-                                            os.path.join(PROOF_FOLDER, NODE2_PROOF_FILE),
-                                            "r",
-                                        ).read()
-                                    )
-                                },
-                                use_poseidon=True,
+                            use_poseidon=True,
+                        ),
+                        childs_proofs=[
+                            ChildProof(
+                                proof=json.loads(
+                                    open(
+                                        os.path.join(PROOF_FOLDER, NODE1_PROOF_FILE),
+                                        "r",
+                                    ).read()
+                                )
                             ),
-                            RunProgramTask(
-                                program=Program.Schema().load(
-                                    json.loads(open(VERIFIER_PROGRAM, "r").read())
-                                ),
-                                program_input={
-                                    "proof": json.loads(
-                                        open(
-                                            os.path.join(PROOF_FOLDER, NODE3_PROOF_FILE),
-                                            "r",
-                                        ).read()
-                                    )
-                                },
-                                use_poseidon=True,
+                            ChildProof(
+                                proof=json.loads(
+                                    open(
+                                        os.path.join(PROOF_FOLDER, NODE2_PROOF_FILE),
+                                        "r",
+                                    ).read()
+                                )
+                            ),
+                            ChildProof(
+                                proof=json.loads(
+                                    open(
+                                        os.path.join(PROOF_FOLDER, NODE3_PROOF_FILE),
+                                        "r",
+                                    ).read()
+                                )
                             ),
                         ],
                     )

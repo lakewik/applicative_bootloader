@@ -96,7 +96,10 @@ func main{
     // Allocate a segment for the bootloader output.
     local bootloader_output_ptr: felt*;
     %{
-        from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput
+        from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput, RunProgramTask
+        from starkware.cairo.lang.compiler.program import Program
+        from objects import ChildProof
+
 
         # Save the aggregator's fact_topologies before running the bootloader.
         aggregator_fact_topologies = fact_topologies
@@ -104,10 +107,36 @@ func main{
 
         # Create a segment for the bootloader output.
         ids.bootloader_output_ptr = segments.add()
+        
+        # Extract verifier compild program and child proofs
+        stark_verifier = applicative_bootloader_input.stark_verifier
+        childs_proofs = applicative_bootloader_input.childs_proofs
+
+        print("meow2")
+
+
+        # Build a list of RunProgramTask objects
+        tasks = []
+        for child in childs_proofs:
+            tasks.append(
+                RunProgramTask(
+                    program=stark_verifier.program,
+                    program_input={
+                                "proof": child.proof
+                    },
+                    use_poseidon=stark_verifier.use_poseidon
+                )
+            )
+
+        print("meow3")
+
+
 
         # Create the bootloader input.
         simple_bootloader_input = SimpleBootloaderInput(
-            tasks=applicative_bootloader_input.tasks, fact_topologies_path=None, single_page=True
+            tasks=tasks,
+            fact_topologies_path=None,
+            single_page=True
         )
 
         # Change output builtin state to a different segment in preparation for running the

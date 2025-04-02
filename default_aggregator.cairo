@@ -21,13 +21,10 @@ func main{
     alloc_locals;
     local child_outputs: felt**;
     local child_output_lengths: felt*;
-    local child_hashes: felt*;
     local num_child_outputs: felt;
-    local bootloader_hash: felt;
 
     %{
         child_outputs = program_input["child_outputs"]
-        child_hashes = program_input["child_hashes"]
 
         child_outputs_ptrs = [segments.gen_arg(sublist) for sublist in child_outputs]
 
@@ -35,8 +32,6 @@ func main{
 
         ids.child_output_lengths = segments.gen_arg([len(sublist) for sublist in child_outputs])
 
-        ids.child_hashes = segments.gen_arg(child_hashes)
-        ids.bootloader_hash = program_input["bootloader_hash"]
         ids.num_child_outputs = len(child_outputs)
     %}
 

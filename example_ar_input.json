@@ -1,0 +1,39 @@
+{
+    "aggregator_task": {
+        "program": {
+             // Compile aggregator program
+        },
+        "program_input": {
+            "child_outputs": [
+                [0, 1, 1, 10, 89, 144],
+                [0, 89, 144, 10, 10946, 17711],
+                [0, 10946, 17711, 10, 1346269, 2178309]
+            ]
+        },
+        "use_poseidon": true,
+        "type": "RunProgramTask"
+    },
+    "stark_verifier": {
+        "program": {
+             // Compiled CAIRO STARK verifier program
+        },
+        "use_poseidon": true
+    },
+    "childs_proofs": [
+        {
+            "proof": {
+                // Child program 1 Cairo STARK Proof
+            }
+        },
+        {
+            "proof": {
+                // Child program 2 Cairo STARK Proof
+            }
+        },
+        {
+            "proof": {
+                // Child program 3 Cairo STARK Proof
+            }
+        }
+    ]
+}
