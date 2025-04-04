@@ -66,3 +66,6 @@ class ApplicativeBootloaderInput(ValidatedMarshmallowDataclass):
             marshmallow_field=mfields.List(mfields.Nested(ChildProof.Schema))
         )
     )
+    output_merkle_tree_hasher: str = field(
+        metadata=additional_metadata(marshmallow_field=mfields.Str())
+    )
