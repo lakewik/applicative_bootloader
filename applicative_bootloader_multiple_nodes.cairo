@@ -267,7 +267,7 @@ func main{
             index=0
         );
     }
-    
+
     let range_check_ptr = range_check_ptr;
     let bitwise_ptr = bitwise_ptr;
     let pedersen_ptr = pedersen_ptr;
@@ -333,8 +333,17 @@ func main{
             let (root_keccak) = merkle_tree_keccak{bitwise_ptr=bitwise_ptr2}(nodes_len, uint256_fact_hashes, 0, 1);
 
             %{
-                print("Fact hasher Merkle Tree root: ", ids.root_keccak)
+                    # Convert low and high parts to hex strings
+                    low_hex = f"{ids.root_keccak.low:032x}"
+                    high_hex = f"{ids.root_keccak.high:032x}"
+                    
+                    # Combine to full 64-character hex string
+                    full_hash_hex = high_hex + low_hex
+                    
+                    # Print input and output
+                    print(f"Fact hasher Merkle Root Keccak hash: 0x{full_hash_hex}")
             %}
+
             let output_ptr = output_ptr + nodes_len;
 
             return ();
