@@ -30,7 +30,7 @@ NODE_PROGRAM = "node.compiled.json"
 DEFAULT_AGGREGATOR_PROGRAM = "default_aggregator.compiled.json"
 DEFAULT_AGGREGATOR_PROGRAM_INPUT_FILE = "default_aggregator.input.json"
 APPLICATIVE_BOOTLOADER_PROGRAM = "applicative_bootloader_multiple_nodes.compiled.json"
-OUTPUT_MERKLE_TREE_HASHER_CHOICE = "POSEIDON" # CAN BE "KECCAK" or "POSEIDON"
+OUTPUT_MERKLE_TREE_HASHER_CHOICE = "KECCAK" # CAN BE "KECCAK" or "POSEIDON"
 
 
 def main():
@@ -117,7 +117,7 @@ def main():
                                 )
                             ),
                         ],
-                        output_merkle_tree_hasher=OUTPUT_MERKLE_TREE_HASHER_CHOICE
+                        output_merkle_tree_hasher_choice=OUTPUT_MERKLE_TREE_HASHER_CHOICE
                     )
                 )
             )

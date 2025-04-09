@@ -3,7 +3,7 @@
 from starkware.cairo.bootloaders.simple_bootloader.run_simple_bootloader import (
     run_simple_bootloader,
 )
-from starkware.cairo.common.cairo_builtins import HashBuiltin, PoseidonBuiltin
+from starkware.cairo.common.cairo_builtins import HashBuiltin, PoseidonBuiltin, BitwiseBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.registers import get_fp_and_pc
@@ -13,7 +13,9 @@ from objects import BootloaderOutput, bootloader_output_extract_output_hashes
 from poseidon_merkle_tree import merkle_tree_poseidon
 from keccak_merkle_tree import merkle_tree_keccak
 from starkware.cairo.common.uint256 import Uint256
-
+from starkware.cairo.common.uint256 import (
+    felt_to_uint256
+)
 
 func hash_verified_program_hashes{
     pedersen_ptr: HashBuiltin*,
@@ -108,6 +110,9 @@ func main{
         from starkware.cairo.lang.compiler.program import Program
         from objects import ChildProof
 
+        POSEIDON_HASH_FUNCTION_CHOICE = ids.POSEIDON_HASH_FUNCTION_CHOICE
+        KECCAK_HASH_FUNCTION_CHOICE = ids.KECCAK_HASH_FUNCTION_CHOICE
+
 
         # Save the aggregator's fact_topologies before running the bootloader.
         aggregator_fact_topologies = fact_topologies
@@ -138,7 +143,16 @@ func main{
 
         print("meow3")
 
-        ids.output_merkle_tree_hasher_choice = applicative_bootloader_input.output_merkle_tree_hasher
+        print(f"output_merkle_tree_hasher_choice: {applicative_bootloader_input.output_merkle_tree_hasher_choice}")
+
+        #ids.output_merkle_tree_hasher_choice = applicative_bootloader_input.output_merkle_tree_hasher_choice
+
+        if applicative_bootloader_input.output_merkle_tree_hasher_choice == "POSEIDON":
+            ids.output_merkle_tree_hasher_choice = POSEIDON_HASH_FUNCTION_CHOICE
+        elif applicative_bootloader_input.output_merkle_tree_hasher_choice == "KECCAK":
+            ids.output_merkle_tree_hasher_choice = KECCAK_HASH_FUNCTION_CHOICE
+        else:
+            raise Exception(f"Unknown hasher choice: {applicative_bootloader_input.output_merkle_tree_hasher_choice}")
 
         # Create the bootloader input.
         simple_bootloader_input = SimpleBootloaderInput(
@@ -253,6 +267,11 @@ func main{
             index=0
         );
     }
+    
+    let range_check_ptr = range_check_ptr;
+    let bitwise_ptr = bitwise_ptr;
+    let pedersen_ptr = pedersen_ptr;
+
 
     assert output_ptr[0] = path_hash;
     let output_ptr = &output_ptr[1];
@@ -261,30 +280,68 @@ func main{
         print("path_hash", ids.path_hash)
     %}
 
+
     memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
     let output_ptr = output_ptr + aggregated_output_length;
+    let range_check_ptr = range_check_ptr;
 
-    //memcpy(dst=output_ptr, src=fact_hashes, len=nodes_len);
-    if (output_merkle_tree_hasher_choice == POSEIDON_HASH_FUNCTION_CHOICE) {
-        let (root) = merkle_tree_poseidon(nodes_len, fact_hashes, 0, 1);
-    } 
-    
+
+
+
+    // POSEIDON CHOICE //
+     if (output_merkle_tree_hasher_choice == POSEIDON_HASH_FUNCTION_CHOICE) {
+            %{
+                print("startig poseidon Merkle Tree construction")
+            %}
+
+                let (root_poseidon) = merkle_tree_poseidon(nodes_len, fact_hashes, 0, 1);
+                    let range_check_ptr = range_check_ptr;
+
+
+
+            %{
+                print("Fact hasher Merkle Tree root: ", ids.root_poseidon)
+            %}
+
+            let output_ptr = output_ptr + nodes_len;
+
+            return ();
+
+        } 
+
+    // KECCAK CHOICE //
     if (output_merkle_tree_hasher_choice == KECCAK_HASH_FUNCTION_CHOICE) {
-        let (local uint256_hashes : Uint256*) = alloc();
+            %{
+                print("startig keccak256 Merkle Tree construction")
+            %}
 
-         felt_array_to_uint256_array{range_check_ptr=range_check_ptr}(nodes_len, fact_hashes, uint256_hashes, 0);
-        
-        
-        let (root) = merkle_tree_keccak(nodes_len, fact_hashes, 0, 1);
+            let (uint256_fact_hashes : Uint256*) = alloc();
+            let uint256_fact_hashes_end = uint256_fact_hashes + nodes_len * Uint256.SIZE;
+
+            %{
+                print("converting fact hahes to uint256")
+            %}
+
+            let (uint256_fact_hashes_end) = felt_array_to_uint256_array(
+                input_array=fact_hashes,
+                output_array=uint256_fact_hashes,
+                length=nodes_len,
+                index=0
+            );
+
+            let bitwise_ptr2 = cast(bitwise_ptr, BitwiseBuiltin*);
+            let (root_keccak) = merkle_tree_keccak{bitwise_ptr=bitwise_ptr2}(nodes_len, uint256_fact_hashes, 0, 1);
+
+            %{
+                print("Fact hasher Merkle Tree root: ", ids.root_keccak)
+            %}
+            let output_ptr = output_ptr + nodes_len;
+
+            return ();
+        } 
+
+        return ();
     }
-    
-    %{
-        print("FAct hasher Merkle Tree root: ", ids.root)
-    %}
-    let output_ptr = output_ptr + nodes_len;
-
-    return ();
-}
 
 
 func compute_fact_hashes{
@@ -335,21 +392,31 @@ func compute_fact_hashes{
 }
 
 
-func felt_array_to_uint256_array{range_check_ptr}(
-    input_len : felt, 
-    input : felt*, 
-    output : Uint256*, 
+
+func felt_array_to_uint256_array{
+  //  syscall_ptr : felt*,
+    pedersen_ptr : HashBuiltin*,
+    range_check_ptr
+}(
+    input_array : felt*,
+    output_array : Uint256*,
+    length : felt,
     index : felt
-) -> () {
-    alloc_locals;
-    
-    if (index == input_len) {
-        return ();
+) -> (output_array : Uint256*) {
+    if (index == length) {
+        return (output_array=output_array);
     }
-    
-    // Convert each felt to Uint256 (low = value, high = 0)
-    assert [output + index] = Uint256([input + index], 0);
-    
-    // Process next element
-    return felt_array_to_uint256_array{range_check_ptr=range_check_ptr}(input_len, input, output, index + 1);
+
+    let current_felt : felt = input_array[index];
+
+    let current_uint256 : Uint256 = felt_to_uint256(current_felt);
+
+    assert output_array[0] = current_uint256;
+
+    return felt_array_to_uint256_array(
+        input_array=input_array,
+        output_array=output_array + Uint256.SIZE,
+        length=length,
+        index=index + 1
+    );
 }
