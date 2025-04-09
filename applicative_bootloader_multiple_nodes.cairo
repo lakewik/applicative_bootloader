@@ -10,6 +10,10 @@ from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.cairo_verifier.objects import CairoVerifierOutput
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash_many
 from objects import BootloaderOutput, bootloader_output_extract_output_hashes
+from poseidon_merkle_tree import merkle_tree_poseidon
+from keccak_merkle_tree import merkle_tree_keccak
+from starkware.cairo.common.uint256 import Uint256
+
 
 func hash_verified_program_hashes{
     pedersen_ptr: HashBuiltin*,
@@ -38,6 +42,9 @@ func main{
     poseidon_ptr: PoseidonBuiltin*,
 }() {
     alloc_locals;
+
+    let KECCAK_HASH_FUNCTION_CHOICE: felt = 497316108213659;
+    let POSEIDON_HASH_FUNCTION_CHOICE: felt = 59887982162162102766224430;
 
     let (__fp__, _) = get_fp_and_pc();
 
@@ -95,6 +102,7 @@ func main{
 
     // Allocate a segment for the bootloader output.
     local bootloader_output_ptr: felt*;
+    local output_merkle_tree_hasher_choice: felt;
     %{
         from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput, RunProgramTask
         from starkware.cairo.lang.compiler.program import Program
@@ -130,7 +138,7 @@ func main{
 
         print("meow3")
 
-
+        ids.output_merkle_tree_hasher_choice = applicative_bootloader_input.output_merkle_tree_hasher
 
         # Create the bootloader input.
         simple_bootloader_input = SimpleBootloaderInput(
@@ -256,7 +264,23 @@ func main{
     memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
     let output_ptr = output_ptr + aggregated_output_length;
 
-    memcpy(dst=output_ptr, src=fact_hashes, len=nodes_len);
+    //memcpy(dst=output_ptr, src=fact_hashes, len=nodes_len);
+    if (output_merkle_tree_hasher_choice == POSEIDON_HASH_FUNCTION_CHOICE) {
+        let (root) = merkle_tree_poseidon(nodes_len, fact_hashes, 0, 1);
+    } 
+    
+    if (output_merkle_tree_hasher_choice == KECCAK_HASH_FUNCTION_CHOICE) {
+        let (local uint256_hashes : Uint256*) = alloc();
+
+         felt_array_to_uint256_array{range_check_ptr=range_check_ptr}(nodes_len, fact_hashes, uint256_hashes, 0);
+        
+        
+        let (root) = merkle_tree_keccak(nodes_len, fact_hashes, 0, 1);
+    }
+    
+    %{
+        print("FAct hasher Merkle Tree root: ", ids.root)
+    %}
     let output_ptr = output_ptr + nodes_len;
 
     return ();
@@ -310,3 +334,22 @@ func compute_fact_hashes{
     }
 }
 
+
+func felt_array_to_uint256_array{range_check_ptr}(
+    input_len : felt, 
+    input : felt*, 
+    output : Uint256*, 
+    index : felt
+) -> () {
+    alloc_locals;
+    
+    if (index == input_len) {
+        return ();
+    }
+    
+    // Convert each felt to Uint256 (low = value, high = 0)
+    assert [output + index] = Uint256([input + index], 0);
+    
+    // Process next element
+    return felt_array_to_uint256_array{range_check_ptr=range_check_ptr}(input_len, input, output, index + 1);
+}
