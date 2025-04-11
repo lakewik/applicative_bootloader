@@ -300,7 +300,7 @@ func main{
 
 
             %{
-                print("Fact hasher Merkle Tree root: ", ids.root_poseidon)
+                print("Fact hasher Merkle Tree root poseidon: ", ids.root_poseidon)
             %}
 
             let output_ptr = output_ptr + nodes_len;
