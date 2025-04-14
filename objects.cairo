@@ -24,6 +24,12 @@ struct ApplicativeResult {
     node_result: NodeResult*,
 }
 
+struct ApplicativeBootloaderOutput {
+    aggregator_program_hash: felt,
+    merkle_tree_root_low: felt,
+    merkle_tree_root_high: felt,
+}
+
 func applicative_result_serialize(obj: ApplicativeResult*) -> felt* {
     let (serialized: felt*) = alloc();
 
@@ -36,6 +42,17 @@ func applicative_result_serialize(obj: ApplicativeResult*) -> felt* {
 
     return serialized;
 }
+
+func applicative_bootloader_output_serialize(obj: ApplicativeBootloaderOutput*) -> felt* {
+    let (serialized: felt*) = alloc();
+
+    assert serialized[0] = obj.aggregator_program_hash;
+    assert serialized[1] = obj.merkle_tree_root_low;
+    assert serialized[2] = obj.merkle_tree_root_high;
+
+    return serialized;
+}
+
 
 struct BootloaderOutput {
     output_length: felt,

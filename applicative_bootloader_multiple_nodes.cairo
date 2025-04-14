@@ -9,9 +9,18 @@ from starkware.cairo.common.memcpy import memcpy
 from starkware.cairo.common.registers import get_fp_and_pc
 from starkware.cairo.cairo_verifier.objects import CairoVerifierOutput
 from starkware.cairo.common.builtin_poseidon.poseidon import poseidon_hash_many
-from objects import BootloaderOutput, bootloader_output_extract_output_hashes
+from objects import ( 
+    BootloaderOutput,
+    bootloader_output_extract_output_hashes, 
+    applicative_bootloader_output_serialize,
+    ApplicativeBootloaderOutput
+)
 from poseidon_merkle_tree import merkle_tree_poseidon
-from keccak_merkle_tree import merkle_tree_keccak
+from keccak_merkle_tree import (
+    merkle_tree_keccak,
+    alloc_uint256_array,
+    hash_leaves_keccak
+)
 from starkware.cairo.common.uint256 import Uint256
 from starkware.cairo.common.uint256 import (
     felt_to_uint256
@@ -40,7 +49,7 @@ func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
-    bitwise_ptr,
+    bitwise_ptr: BitwiseBuiltin*,
     poseidon_ptr: PoseidonBuiltin*,
 }() {
     alloc_locals;
@@ -81,10 +90,13 @@ func main{
     // Save aggregator output start.
     let aggregator_output_start: felt* = aggregator_output_ptr;
 
+    let bitwise_ptr2 = cast(bitwise_ptr, felt);
+
     // Execute the simple bootloader with the aggregator task.
-    run_simple_bootloader{output_ptr=aggregator_output_ptr}();
+    run_simple_bootloader{output_ptr=aggregator_output_ptr, bitwise_ptr=bitwise_ptr2}();
     let range_check_ptr = range_check_ptr;
-    let bitwise_ptr = bitwise_ptr;
+    //let bitwise_ptr = bitwise_ptr;
+    let bitwise_ptr2 = bitwise_ptr2;
     let pedersen_ptr: HashBuiltin* = pedersen_ptr;
     let poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local aggregator_output_end: felt* = aggregator_output_ptr;
@@ -163,6 +175,7 @@ func main{
 
         # Change output builtin state to a different segment in preparation for running the
         # bootloader.
+        applicative_output_builtin_state = output_builtin.get_state()
         output_builtin.new_state(base=ids.bootloader_output_ptr)
     %}
 
@@ -174,9 +187,12 @@ func main{
     let bootloader_output_start = bootloader_output_ptr;
 
     // Execute the bootloader.
-    run_simple_bootloader{output_ptr=bootloader_output_ptr}();
+    let bitwise_ptr2 = cast(bitwise_ptr, felt);
+    run_simple_bootloader{output_ptr=bootloader_output_ptr, bitwise_ptr=bitwise_ptr2}();
     let range_check_ptr = range_check_ptr;
-    let bitwise_ptr = bitwise_ptr;
+   // let bitwise_ptr = bitwise_ptr;
+   //let bitwise_ptr2 = bitwise_ptr2;
+   let bitwise_ptr2 = cast(bitwise_ptr, felt);
     let pedersen_ptr: HashBuiltin* = pedersen_ptr;
     let poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local bootloader_output_end: felt* = bootloader_output_ptr;
@@ -269,20 +285,20 @@ func main{
     }
 
     let range_check_ptr = range_check_ptr;
-    let bitwise_ptr = bitwise_ptr;
+    //let bitwise_ptr = bitwise_ptr;
     let pedersen_ptr = pedersen_ptr;
 
 
-    assert output_ptr[0] = path_hash;
-    let output_ptr = &output_ptr[1];
+  //  assert output_ptr[0] = path_hash;
+  //  let output_ptr = &output_ptr[1];
 
     %{
-        print("path_hash", ids.path_hash)
+        #print("path_hash", ids.path_hash)
     %}
 
 
-    memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
-    let output_ptr = output_ptr + aggregated_output_length;
+   // memcpy(dst=output_ptr, src=aggregated_output_ptr, len=aggregated_output_length);
+  //  let output_ptr = output_ptr + aggregated_output_length;
     let range_check_ptr = range_check_ptr;
 
 
@@ -303,9 +319,20 @@ func main{
                 print("Fact hasher Merkle Tree root poseidon: ", ids.root_poseidon)
             %}
 
-            let output_ptr = output_ptr + nodes_len;
+                local applicative_bootloader_output: ApplicativeBootloaderOutput = ApplicativeBootloaderOutput(
+                    aggregator_program_hash=aggregator_program_hash,
+                    merkle_tree_root_low=root_poseidon,
+                    merkle_tree_root_high=0
+                );
 
-            return ();
+                memcpy(
+                    dst=output_ptr,
+                    src=applicative_bootloader_output_serialize(obj=&applicative_bootloader_output),
+                    len=ApplicativeBootloaderOutput.SIZE,
+                );
+                let output_ptr = &output_ptr[ApplicativeBootloaderOutput.SIZE];
+
+                return ();
 
         } 
 
@@ -329,22 +356,36 @@ func main{
                 index=0
             );
 
-            let bitwise_ptr2 = cast(bitwise_ptr, BitwiseBuiltin*);
-            let (root_keccak) = merkle_tree_keccak{bitwise_ptr=bitwise_ptr2}(nodes_len, uint256_fact_hashes, 0, 1);
+            // let bitwise_ptr2 = cast(bitwise_ptr, BitwiseBuiltin*);
+            // let (hashed_fact_hashes_leaves: Uint256*) = alloc_uint256_array(nodes_len);
+          //  let (hashed_fact_hashes_leaves_len) = hash_leaves_keccak{bitwise_ptr=bitwise_ptr}(nodes_len, uint256_fact_hashes, 0, hashed_fact_hashes_leaves, 0);
+            // //return merkle_tree_keccak(hashed_data_len, hashed_data, 1, commutative);
+            // let (root_keccak) = merkle_tree_keccak{bitwise_ptr=bitwise_ptr2}(nodes_len, hashed_fact_hashes_leaves, 1, 1);
 
-            %{
-                    # Convert low and high parts to hex strings
-                    low_hex = f"{ids.root_keccak.low:032x}"
-                    high_hex = f"{ids.root_keccak.high:032x}"
+            // %{
+            //         # Convert low and high parts to hex strings
+            //         low_hex = f"{ids.root_keccak.low:032x}"
+            //         high_hex = f"{ids.root_keccak.high:032x}"
                     
-                    # Combine to full 64-character hex string
-                    full_hash_hex = high_hex + low_hex
+            //         # Combine to full 64-character hex string
+            //         full_hash_hex = high_hex + low_hex
                     
-                    # Print input and output
-                    print(f"Fact hasher Merkle Root Keccak hash: 0x{full_hash_hex}")
-            %}
+            //         # Print input and output
+            //         print(f"Fact hasher Merkle Root Keccak hash: 0x{full_hash_hex}")
+            // %}
 
-            let output_ptr = output_ptr + nodes_len;
+            //  local applicative_bootloader_output: ApplicativeBootloaderOutput = ApplicativeBootloaderOutput(
+            //         aggregator_program_hash=aggregator_program_hash,
+            //         merkle_tree_root_low=root_keccak.low,
+            //         merkle_tree_root_high=root_keccak.high
+            // );
+
+            // memcpy(
+            //         dst=output_ptr,
+            //         src=applicative_bootloader_output_serialize(obj=&applicative_bootloader_output),
+            //         len=ApplicativeBootloaderOutput.SIZE - 1,
+            // );
+            // let output_ptr = &output_ptr[ApplicativeBootloaderOutput.SIZE - 1];
 
             return ();
         } 
@@ -371,12 +412,12 @@ func compute_fact_hashes{
 
 
     let (hash_input: felt*) = alloc();
-    assert hash_input[0] = aggregator_hash;
-    assert hash_input[1] = child_hashes[index];
-    assert hash_input[2] = child_outputs_hashes[index];
+   // assert hash_input[0] = aggregator_hash;
+    assert hash_input[0] = child_hashes[index];
+    assert hash_input[1] = child_outputs_hashes[index];
 
     let (fact_hash) = poseidon_hash_many(
-        n=3,
+        n=2,
         elements=hash_input
     );
 
