@@ -1,3 +1,7 @@
+cairo-format -i default_aggregator.cairo
+cairo-format -i applicative_bootloader_multiple_nodes.cairo
+cairo-format -i poseidon_merkle_tree.cairo
+cairo-format -i keccak_merkle_tree.cairo
 cairo-format -i aggregator.cairo
 cairo-format -i applicative_bootloader.cairo 
 cairo-format -i node.cairo

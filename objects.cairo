@@ -53,7 +53,6 @@ func applicative_bootloader_output_serialize(obj: ApplicativeBootloaderOutput*) 
     return serialized;
 }
 
-
 struct BootloaderOutput {
     output_length: felt,
     program_hash: felt,
