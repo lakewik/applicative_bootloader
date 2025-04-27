@@ -1,4 +1,4 @@
-%builtins output pedersen range_check bitwise poseidon
+%builtins output pedersen range_check ecdsa bitwise ec_op keccak poseidon range_check96 add_mod mul_mod
 
 from starkware.cairo.bootloaders.simple_bootloader.run_simple_bootloader import (
     run_simple_bootloader,
@@ -24,8 +24,20 @@ func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
+    ecdsa_ptr,
     bitwise_ptr,
-    poseidon_ptr: PoseidonBuiltin*,
+    ec_op_ptr,
+      keccak_ptr,
+     poseidon_ptr: PoseidonBuiltin*,
+       
+             
+
+
+    range_check96_ptr,
+
+    add_mod_ptr,
+    mul_mod_ptr,
+   
 }() {
     alloc_locals;
 
@@ -44,9 +56,12 @@ func main{
     let aggregator_output_start: felt* = aggregator_output_ptr;
 
     // Execute the simple bootloader with the aggregator task.
-    run_simple_bootloader{output_ptr=aggregator_output_ptr}();
+    run_simple_bootloader{output_ptr=aggregator_output_ptr,keccak_ptr=keccak_ptr}();
     local range_check_ptr = range_check_ptr;
     local bitwise_ptr = bitwise_ptr;
+    local ecdsa_ptr = ecdsa_ptr;
+    local ec_op_ptr = ec_op_ptr;
+    local keccak_ptr = keccak_ptr;
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     local poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local aggregator_output_end: felt* = aggregator_output_ptr;
@@ -78,7 +93,9 @@ func main{
     run_simple_bootloader{output_ptr=bootloader_output_ptr}();
     local range_check_ptr = range_check_ptr;
     local bitwise_ptr = bitwise_ptr;
-
+    local ecdsa_ptr = ecdsa_ptr;
+    local ec_op_ptr = ec_op_ptr;
+    local keccak_ptr = keccak_ptr;
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     local poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local bootloader_output_end: felt* = bootloader_output_ptr;

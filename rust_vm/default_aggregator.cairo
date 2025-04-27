@@ -22,19 +22,9 @@ func main{
     local child_output_lengths: felt*;
     local num_child_outputs: felt;
 
-    %{
-        child_outputs = program_input["child_outputs"]
+    %{ prepare_default_aggregator() %}
 
-        child_outputs_ptrs = [segments.gen_arg(sublist) for sublist in child_outputs]
-
-        ids.child_outputs = segments.gen_arg(child_outputs_ptrs)
-
-        ids.child_output_lengths = segments.gen_arg([len(sublist) for sublist in child_outputs])
-
-        ids.num_child_outputs = len(child_outputs)
-    %}
-
-    %{ print("starting default aggregator execution") %}
+    //%{ print("starting default aggregator execution") %}
 
     let (child_outputs_hashes: felt*) = alloc();
     with poseidon_ptr {
@@ -53,7 +43,7 @@ func main{
 
     let (input_hash: felt) = poseidon_hash_many(n=num_child_outputs, elements=child_outputs_hashes);
 
-    %{ print("input_hash calculated in aggregator from childs outputs hashes", ids.input_hash) %}
+  //  %{ print("input_hash calculated in aggregator from childs outputs hashes", ids.input_hash) %}
 
     assert output_ptr[0] = input_hash;
     let output_ptr = &output_ptr[1];
@@ -87,10 +77,10 @@ func compute_childs_outputs_hashes{poseidon_ptr: PoseidonBuiltin*}(
 
     let (output_hash) = poseidon_hash_many(n=output_len, elements=output_ptr);
 
-    %{
-        print("aggregator processing child at index", ids.index)
-        print("child output hash", ids.output_hash)
-    %}
+    // %{
+    //     print("aggregator processing child at index", ids.index)
+    //     print("child output hash", ids.output_hash)
+    // %}
 
     assert child_outputs_hashes[index] = output_hash;
 
