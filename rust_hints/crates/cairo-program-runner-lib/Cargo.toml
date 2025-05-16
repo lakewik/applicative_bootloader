@@ -1,0 +1,38 @@
+[package]
+name = "cairo-program-runner-lib"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+bincode.workspace = true
+cairo-vm.workspace = true
+cairo-lang-runner.workspace = true
+clap.workspace = true
+num-traits.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+starknet-crypto.workspace = true
+starknet-types-core.workspace = true
+thiserror.workspace = true
+thiserror-no-std.workspace = true
+regex.workspace = true
+num-bigint.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+rstest = "0.19.0"
+
+
+[[bin]]
+name = "example_cairo_run"
+path = "examples/run_program.rs"
+
+[[bin]]
+name = "example_ar_run"
+path = "examples/run_ar.rs"
+
+[[bin]]
+name = "example_verifier_run"
+path = "examples/run_verifier.rs"
