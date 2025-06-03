@@ -1,4 +1,4 @@
-%builtins output pedersen range_check bitwise poseidon
+%builtins output pedersen range_check ecdsa bitwise ec_op keccak poseidon range_check96 add_mod mul_mod
 
 from starkware.cairo.bootloaders.simple_bootloader.run_simple_bootloader import (
     run_simple_bootloader,
@@ -24,8 +24,14 @@ func main{
     output_ptr: felt*,
     pedersen_ptr: HashBuiltin*,
     range_check_ptr,
+    ecdsa_ptr,
     bitwise_ptr,
+    ec_op_ptr,
+    keccak_ptr,
     poseidon_ptr: PoseidonBuiltin*,
+    range_check96_ptr,
+    add_mod_ptr,
+    mul_mod_ptr,
 }() {
     alloc_locals;
 
@@ -60,6 +66,9 @@ func main{
 
     %{ print("applicative bootloader starting aggregator bootloading phase") %}
 
+    // // Check if the number of childs outputs matches with the number of child proofs provided
+    // assert num_proofs_provided = nodes_len;
+
     // Save aggregator output start.
     let aggregator_output_start: felt* = aggregator_output_ptr;
 
@@ -67,6 +76,9 @@ func main{
     run_simple_bootloader{output_ptr=aggregator_output_ptr}();
     local range_check_ptr = range_check_ptr;
     local bitwise_ptr = bitwise_ptr;
+    local ecdsa_ptr = ecdsa_ptr;
+    local ec_op_ptr = ec_op_ptr;
+    local keccak_ptr = keccak_ptr;
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     local poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local aggregator_output_end: felt* = aggregator_output_ptr;
@@ -87,6 +99,8 @@ func main{
     // Allocate a segment for the bootloader output.
     local bootloader_output_ptr: felt*;
     local output_merkle_tree_hasher_choice: felt;
+
+
     %{
         from starkware.cairo.bootloaders.simple_bootloader.objects import SimpleBootloaderInput, RunProgramTask
         from starkware.cairo.lang.compiler.program import Program
@@ -108,7 +122,6 @@ func main{
         childs_proofs = applicative_bootloader_input.childs_proofs
 
 
-
         # Build a list of RunProgramTask objects
         tasks = []
         for child in childs_proofs:
@@ -122,6 +135,7 @@ func main{
                 )
             )
 
+        #ids.num_proofs_provided = len(childs_proofs)
 
         print(f"output_merkle_tree_hasher_choice: {applicative_bootloader_input.output_merkle_tree_hasher_choice}")
 
@@ -145,6 +159,7 @@ func main{
         output_builtin.new_state(base=ids.bootloader_output_ptr)
     %}
 
+
     %{ print("applicative bootloader starting verifiers bootloading phase") %}
 
     // Save the bootloader output start.
@@ -154,7 +169,9 @@ func main{
     run_simple_bootloader{output_ptr=bootloader_output_ptr}();
     local range_check_ptr = range_check_ptr;
     local bitwise_ptr = bitwise_ptr;
-
+    local ecdsa_ptr = ecdsa_ptr;
+    local ec_op_ptr = ec_op_ptr;
+    local keccak_ptr = keccak_ptr;
     local pedersen_ptr: HashBuiltin* = pedersen_ptr;
     local poseidon_ptr: PoseidonBuiltin* = poseidon_ptr;
     local bootloader_output_end: felt* = bootloader_output_ptr;
@@ -199,27 +216,6 @@ func main{
         output_builtin.set_state(applicative_output_builtin_state)
     %}
 
-    let aggregated_output_ptr = aggregator_input_ptr + 1;
-    let aggregated_output_length = aggregator_output_end - aggregated_output_ptr;
-
-    let (path_hash_buff: felt*) = alloc();
-    tempvar path_hash_buff_size = nodes_len + 2;
-
-    // aggregator program path_hash
-    assert path_hash_buff[0] = aggregated_output_ptr[0];
-
-    // aggregator program hash
-    assert path_hash_buff[1] = aggregator_program_hash;
-
-    // copy all verified program hashes
-    let (path_hash_ptr: felt*) = alloc();
-    let path_hash_ptr = path_hash_buff + 2;
-
-    // copy verified program hashes to path_hash_buff
-    memcpy(dst=path_hash_ptr, src=verified_program_hashes, len=nodes_len);
-
-    // calclate the final path hash
-    let (path_hash: felt) = poseidon_hash_many(n=nodes_len + 2, elements=path_hash_buff);
 
     let (fact_hashes: felt*) = alloc();
     with poseidon_ptr {
